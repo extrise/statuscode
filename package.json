@@ -1,0 +1,142 @@
+{
+  "name": "statuscode",
+  "displayName": "StatusCode - Discord Rich Presence",
+  "description": "Show your Visual Studio Code activity on Discord with beautiful Rich Presence",
+  "version": "1.0.0",
+  "publisher": "extrise",
+  "author": {
+    "name": "Extrise",
+    "url": "https://github.com/extrise"
+  },
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/extrise/statuscode"
+  },
+  "bugs": {
+    "url": "https://github.com/extrise/statuscode/issues"
+  },
+  "homepage": "https://github.com/extrise/statuscode#readme",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "discord",
+    "rich presence",
+    "activity",
+    "status",
+    "rpc",
+    "game activity",
+    "vscode"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "statuscode.enable",
+        "title": "StatusCode: Enable Rich Presence"
+      },
+      {
+        "command": "statuscode.disable",
+        "title": "StatusCode: Disable Rich Presence"
+      },
+      {
+        "command": "statuscode.reconnect",
+        "title": "StatusCode: Reconnect to Discord"
+      }
+    ],
+    "configuration": {
+      "title": "StatusCode",
+      "properties": {
+        "statuscode.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable Discord Rich Presence"
+        },
+        "statuscode.details": {
+          "type": "string",
+          "default": "Coding in Visual Studio Code",
+          "description": "Custom details text shown in Discord"
+        },
+        "statuscode.state": {
+          "type": "string",
+          "default": "Editing {filename}",
+          "description": "Custom state text. Use {filename}, {workspace}, {language}"
+        },
+        "statuscode.largeImageText": {
+          "type": "string",
+          "default": "Visual Studio Code",
+          "description": "Text shown when hovering over the large image"
+        },
+        "statuscode.showFileName": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show currently editing file name"
+        },
+        "statuscode.showWorkspace": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show workspace/folder name"
+        },
+        "statuscode.showLanguage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show programming language icon"
+        },
+        "statuscode.showElapsedTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show elapsed time since VS Code started"
+        },
+        "statuscode.showFileIcon": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show file type icon as small image"
+        },
+        "statuscode.idleTimeout": {
+          "type": "number",
+          "default": 0,
+          "description": "Hide presence after X minutes of inactivity (0 = disabled)"
+        },
+        "statuscode.reconnectInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "Discord reconnection interval in milliseconds"
+        },
+        "statuscode.updateInterval": {
+          "type": "number",
+          "default": 15000,
+          "description": "Activity update interval in milliseconds"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./tsconfig.extension.json",
+    "watch": "tsc -watch -p ./tsconfig.extension.json",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "@vscode/vsce": "^2.21.0",
+    "eslint": "^8.47.0",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "discord-rpc": "^4.0.1"
+  }
+}

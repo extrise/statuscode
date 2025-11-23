@@ -1,0 +1,105 @@
+name: Publish StatusCode Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Configure Git identity
+        run: |
+          git config user.name "nayandas69"
+          git config user.email "174907517+nayandas69@users.noreply.github.com"
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Compile TypeScript
+        run: npm run compile
+      
+      - name: Package extension
+        run: npm run package
+      
+      - name: Get extension version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # First release - get all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            # Get commits since last tag
+            CHANGELOG=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Save to GitHub output using multiline format
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: StatusCode ${{ github.ref_name }}
+          body: |
+            ## StatusCode - Discord Rich Presence ${{ github.ref_name }}
+            
+            Show your Visual Studio Code activity on Discord with beautiful Rich Presence.
+            
+            ### Installation
+            
+            **Option 1: Install from VSIX file**
+            1. Download `statuscode-${{ steps.version.outputs.version }}.vsix` from the assets below
+            2. Open VS Code
+            3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+            4. Type "Extensions: Install from VSIX"
+            5. Select the downloaded `.vsix` file
+            6. Restart VS Code
+            
+            **Option 2: VS Code Marketplace**
+            Search for "StatusCode" in the VS Code Extensions panel and click Install.
+            Or visit the [StatusCode Marketplace page](https://marketplace.visualstudio.com/items?itemName=extrise.statuscode) and click "Install".
+            
+            ### What's Changed
+            
+            ${{ steps.changelog.outputs.previous_tag && format('Changes since {0}:', steps.changelog.outputs.previous_tag) || 'Initial release' }}
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ---
+            
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.previous_tag }}...${{ github.ref_name }}
+          files: |
+            statuscode-${{ steps.version.outputs.version }}.vsix
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
