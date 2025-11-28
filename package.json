@@ -2,7 +2,7 @@
   "name": "statuscode",
   "displayName": "StatusCode - Discord Rich Presence",
   "description": "Show your Visual Studio Code activity on Discord with beautiful Rich Presence",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "extrise",
   "author": {
     "name": "Extrise",
@@ -99,6 +99,16 @@
           "type": "boolean",
           "default": true,
           "description": "Show file type icon as small image"
+        },
+        "statuscode.showGitHubRepo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show GitHub repository URL with clickable button"
+        },
+        "statuscode.showIssues": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show error and warning count for current file"
         },
         "statuscode.idleTimeout": {
           "type": "number",

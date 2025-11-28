@@ -3,10 +3,9 @@
  * Handles connection and communication with Discord client
  */
 
-import * as DiscordRPC from "discord-rpc";
-import { CLIENT_ID, LARGE_IMAGE_KEY, LARGE_IMAGE_TEXT } from "./config";
+import * as DiscordRPC from "discord-rpc"
+import { CLIENT_ID, LARGE_IMAGE_KEY, LARGE_IMAGE_TEXT } from "./config"
 
-// Type for Discord presence data
 interface PresenceData {
   details?: string
   state?: string
@@ -15,6 +14,7 @@ interface PresenceData {
   largeImageText?: string
   smallImageKey?: string
   smallImageText?: string
+  buttons?: Array<{ label: string; url: string }>
   instance?: boolean
 }
 
@@ -22,18 +22,18 @@ interface PresenceData {
  * Manages Discord RPC connection and presence updates
  */
 export class DiscordClient {
-  private client: DiscordRPC.Client | undefined;
-  private connected = false;
-  private reconnectAttempts = 0;
-  private readonly maxReconnectAttempts: number = 5;
-  private reconnectTimer: NodeJS.Timeout | undefined;
+  private client: DiscordRPC.Client | undefined
+  private connected = false
+  private reconnectAttempts = 0
+  private readonly maxReconnectAttempts: number = 5
+  private reconnectTimer: NodeJS.Timeout | undefined
 
   constructor() {
     try {
-      this.client = new DiscordRPC.Client({ transport: "ipc" });
-      this.setupEventHandlers();
+      this.client = new DiscordRPC.Client({ transport: "ipc" })
+      this.setupEventHandlers()
     } catch (error) {
-      throw error;
+      throw error
     }
   }
 
@@ -42,20 +42,20 @@ export class DiscordClient {
    */
   private setupEventHandlers(): void {
     if (!this.client) {
-      return;
+      return
     }
 
     // Handle successful connection
     this.client.on("ready", () => {
-      this.connected = true;
-      this.reconnectAttempts = 0;
-    });
+      this.connected = true
+      this.reconnectAttempts = 0
+    })
 
     // Handle disconnection
     this.client.on("disconnected", () => {
-      this.connected = false;
-      this.handleDisconnect();
-    });
+      this.connected = false
+      this.handleDisconnect()
+    })
   }
 
   /**
@@ -64,18 +64,18 @@ export class DiscordClient {
    */
   async connect(): Promise<void> {
     if (this.connected) {
-      return;
+      return
     }
 
     if (!this.client) {
-      throw new Error("Discord RPC client not initialized");
+      throw new Error("Discord RPC client not initialized")
     }
 
     try {
       // Login to Discord RPC with application client ID
-      await this.client.login({ clientId: CLIENT_ID });
+      await this.client.login({ clientId: CLIENT_ID })
     } catch (error) {
-      throw error;
+      throw error
     }
   }
 
@@ -84,14 +84,14 @@ export class DiscordClient {
    */
   async disconnect(): Promise<void> {
     if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = undefined;
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = undefined
     }
 
     if (this.client && this.connected) {
       try {
-        await this.client.destroy();
-        this.connected = false;
+        await this.client.destroy()
+        this.connected = false
       } catch (error) {
         // Silently handle disconnect errors
       }
@@ -104,11 +104,11 @@ export class DiscordClient {
    */
   async setActivity(presence: PresenceData): Promise<void> {
     if (!this.connected || !this.client) {
-      return;
+      return
     }
 
     try {
-      const activityPayload = {
+      const activityPayload: any = {
         details: presence.details || "Coding in VS Code",
         state: presence.state || "Working on a project",
         startTimestamp: presence.startTimestamp,
@@ -117,12 +117,16 @@ export class DiscordClient {
         smallImageKey: presence.smallImageKey,
         smallImageText: presence.smallImageText,
         instance: false,
-      };
+      }
 
-      await this.client.setActivity(activityPayload);
+      if (presence.buttons && presence.buttons.length > 0) {
+        activityPayload.buttons = presence.buttons
+      }
+
+      await this.client.setActivity(activityPayload)
     } catch (error) {
       if (error instanceof Error && error.message.includes("connection")) {
-        this.connected = false;
+        this.connected = false
       }
     }
   }
@@ -132,11 +136,11 @@ export class DiscordClient {
    */
   async clearActivity(): Promise<void> {
     if (!this.connected || !this.client) {
-      return;
+      return
     }
 
     try {
-      await this.client.clearActivity();
+      await this.client.clearActivity()
     } catch (error) {
       // Silently handle clear errors
     }
@@ -148,33 +152,33 @@ export class DiscordClient {
   private handleDisconnect(): void {
     // Prevent multiple reconnection attempts
     if (this.reconnectTimer) {
-      return;
+      return
     }
 
     // Stop reconnecting after max attempts
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      return;
+      return
     }
 
     // Exponential backoff for reconnection
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
 
     this.reconnectTimer = setTimeout(async () => {
-      this.reconnectTimer = undefined;
-      this.reconnectAttempts++;
+      this.reconnectTimer = undefined
+      this.reconnectAttempts++
 
       try {
-        await this.connect();
+        await this.connect()
       } catch (error) {
-        this.handleDisconnect();
+        this.handleDisconnect()
       }
-    }, delay);
+    }, delay)
   }
 
   /**
    * Check if client is connected to Discord
    */
   isConnected(): boolean {
-    return this.connected;
+    return this.connected
   }
 }
