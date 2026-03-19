@@ -77,6 +77,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Initialize activity manager with Discord client
     activityManager = new ActivityManager(discordClient, config)
 
+    // Setup status bar updates based on Discord client events
+    discordClient.onReady(() => updateStatusBar("Connected", true))
+    discordClient.onDisconnected(() => updateStatusBar("Disconnected", false))
+
     // Watch for configuration changes
     context.subscriptions.push(
       vscode.workspace.onDidChangeConfiguration((e) => {

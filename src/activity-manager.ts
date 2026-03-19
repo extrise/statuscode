@@ -16,6 +16,9 @@ export class ActivityManager {
   private active = false
   private idleCheckInterval: NodeJS.Timeout | undefined
   private currentEditor: vscode.TextEditor | undefined
+  private gitRepoUrl: string | undefined
+  private lastRepoUrlCheck = 0
+  private readonly repoUrlCacheMs = 60000 // Cache for 1 minute
   private disposables: vscode.Disposable[] = []
 
   constructor(
@@ -138,7 +141,8 @@ export class ActivityManager {
     const idleTimeout = this.config.getIdleTimeout()
     const timeSinceActivity = Date.now() - this.lastActivityTime
 
-    if (timeSinceActivity > idleTimeout) {
+    // Handle 0 as disabled
+    if (idleTimeout > 0 && timeSinceActivity > idleTimeout) {
       // User is idle - update presence to show idle state
       this.discordClient.setActivity({
         details: "Idle",
@@ -153,15 +157,24 @@ export class ActivityManager {
    * @returns GitHub repository URL or undefined if not found
    */
   private async getGitHubRepoUrl(): Promise<string | undefined> {
+    // Return cached value if it's still fresh
+    const now = Date.now()
+    if (this.gitRepoUrl !== undefined && now - this.lastRepoUrlCheck < this.repoUrlCacheMs) {
+      return this.gitRepoUrl
+    }
+
     try {
+      this.lastRepoUrlCheck = now
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
+        this.gitRepoUrl = undefined
         return undefined
       }
 
       // Get Git extension
       const gitExtension = vscode.extensions.getExtension("vscode.git")
       if (!gitExtension) {
+        this.gitRepoUrl = undefined
         return undefined
       }
 
@@ -169,6 +182,7 @@ export class ActivityManager {
       const api = git.getAPI(1)
 
       if (api.repositories.length === 0) {
+        this.gitRepoUrl = undefined
         return undefined
       }
 
@@ -186,13 +200,16 @@ export class ActivityManager {
           }
           // Remove .git suffix
           httpsUrl = httpsUrl.replace(/\.git$/, "")
+          this.gitRepoUrl = httpsUrl
           return httpsUrl
         }
       }
 
+      this.gitRepoUrl = undefined
       return undefined
     } catch (error) {
       // Silently fail if Git is not available
+      this.gitRepoUrl = undefined
       return undefined
     }
   }
@@ -264,6 +281,7 @@ export class ActivityManager {
       details: this.config.shouldShowFileName() ? details : "Editing a file",
       state: this.config.shouldShowWorkspace() ? state : "Working in VS Code",
       startTimestamp: this.config.shouldShowElapsedTime() ? this.startTimestamp : undefined,
+      largeImageText: this.config.getLargeImageText(),
       smallImageKey: languageIcon.key,
       smallImageText: languageIcon.text,
     }

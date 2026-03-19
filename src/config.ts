@@ -175,20 +175,28 @@ export class ConfigManager {
    * Get details format string
    */
   getDetailsFormat(): string {
-    return this.config.get<string>("detailsFormat", "Editing {filename}")
+    return this.config.get<string>("details", "Coding in Visual Studio Code")
   }
 
   /**
    * Get state format string
    */
   getStateFormat(): string {
-    return this.config.get<string>("stateFormat", "Working on {workspace}")
+    return this.config.get<string>("state", "Editing {filename}")
   }
 
   /**
-   * Get idle timeout in milliseconds
+   * Get large image hover text
+   */
+  getLargeImageText(): string {
+    return this.config.get<string>("largeImageText", "Visual Studio Code")
+  }
+
+  /**
+   * Get idle timeout in minutes (converted to milliseconds)
    */
   getIdleTimeout(): number {
-    return this.config.get<number>("idleTimeout", 300000)
+    const minutes = this.config.get<number>("idleTimeout", 0)
+    return minutes * 60 * 1000
   }
 }

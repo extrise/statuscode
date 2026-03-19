@@ -27,6 +27,8 @@ export class DiscordClient {
   private reconnectAttempts = 0
   private readonly maxReconnectAttempts: number = 5
   private reconnectTimer: NodeJS.Timeout | undefined
+  private onReadyCallback: (() => void) | undefined
+  private onDisconnectedCallback: (() => void) | undefined
 
   constructor() {
     try {
@@ -49,13 +51,33 @@ export class DiscordClient {
     this.client.on("ready", () => {
       this.connected = true
       this.reconnectAttempts = 0
+      if (this.onReadyCallback) {
+        this.onReadyCallback()
+      }
     })
 
     // Handle disconnection
     this.client.on("disconnected", () => {
       this.connected = false
+      if (this.onDisconnectedCallback) {
+        this.onDisconnectedCallback()
+      }
       this.handleDisconnect()
     })
+  }
+
+  /**
+   * Register callback for when Discord client is ready
+   */
+  onReady(callback: () => void): void {
+    this.onReadyCallback = callback
+  }
+
+  /**
+   * Register callback for when Discord client is disconnected
+   */
+  onDisconnected(callback: () => void): void {
+    this.onDisconnectedCallback = callback
   }
 
   /**
