@@ -10,7 +10,7 @@
 [![Visual Studio Marketplace Version (short)](https://vsmarketplacebadges.dev/version-short/ExtRise.statuscode.svg)](https://marketplace.visualstudio.com/items?itemName=ExtRise.statuscode)
 [![Visual Studio Marketplace Downloads (short)](https://vsmarketplacebadges.dev/downloads-short/ExtRise.statuscode.svg)](https://marketplace.visualstudio.com/items?itemName=ExtRise.statuscode)
 [![CI](https://github.com/extrise/statuscode/actions/workflows/ci.yml/badge.svg)](https://github.com/extrise/statuscode/actions/workflows/ci.yml)
-[![Publish](https://github.com/nmlletras/statuscode/actions/workflows/publish.yml/badge.svg)](https://github.com/nmlletras/statuscode/actions/workflows/publish.yml)
+[![Publish](https://github.com/extrise/statuscode/actions/workflows/publish.yml/badge.svg)](https://github.com/extrise/statuscode/actions/workflows/publish.yml)
 
 **Show off your coding activity on Discord with beautiful Rich Presence — right from VS Code.**
 
