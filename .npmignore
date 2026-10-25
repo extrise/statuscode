@@ -1,0 +1,22 @@
+# Keep npm pack clean; `vsce package` uses .vscodeignore instead.
+node_modules/
+out/test/
+src/
+.eslintignore
+.eslintrc.json
+.eslintcache
+.prettierrc.json
+.prettierignore
+.vscode/
+.vscodeignore
+.vscode-test/
+tsconfig.json
+.github/
+.env
+.env.local
+.env.example
+*.log
+npm-debug.log*
+*.tsbuildinfo
+.DS_Store
+Thumbs.db

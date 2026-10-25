@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "ES2020",
+    "module": "nodenext",
+    "target": "ES2022",
     "outDir": "out",
-    "lib": ["ES2020"],
+    "lib": ["ES2022"],
     "sourceMap": true,
     "rootDir": "src",
     "strict": true,
@@ -16,7 +16,8 @@
     "noImplicitReturns": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true
   },

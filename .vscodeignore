@@ -6,12 +6,16 @@ src/**
 vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json
+**/eslint.config.mjs
+**/.prettierrc.json
+**/.prettierignore
 **/*.map
 **/*.ts
 .env
 .env.local
 .env.example
 out/test/**
+.github/**
 .git
 .DS_Store
 *.md

@@ -2,7 +2,7 @@
   "name": "statuscode",
   "displayName": "StatusCode - Discord Rich Presence",
   "description": "Show your Visual Studio Code activity on Discord with beautiful Rich Presence",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "extrise",
   "author": {
     "name": "Extrise",
@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/extrise/statuscode#readme",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.138.0"
   },
   "categories": [
     "Other"
@@ -132,21 +132,33 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc",
     "watch": "tsc -watch",
-    "lint": "eslint src --ext ts",
-    "lint:fix": "eslint src --ext ts --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "tsc && node --test \"out/test/**/*.test.js\"",
     "package": "vsce package",
     "publish": "vsce publish"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/vscode": "^1.80.0",
-    "@typescript-eslint/eslint-plugin": "^8.57.1",
-    "@typescript-eslint/parser": "^8.57.1",
-    "@vscode/vsce": "^3.7.1",
-    "eslint": "^8.57.1",
-    "typescript": "^5.1.6"
+    "@types/node": "^26.6.5",
+    "@types/vscode": "^1.138.0",
+    "@vscode/vsce": "^4.0.0",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.0"
   },
   "dependencies": {
     "discord-rpc": "^4.0.1"
+  },
+  "allowScripts": {
+    "@vscode/vsce-sign": true,
+    "register-scheme": true
+  },
+  "overrides": {
+    "@azure/msal-node": "^7.1.1",
+    "ws": "^7.5.11",
+    "qs": "^6.16.1"
   }
 }

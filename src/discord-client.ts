@@ -1,154 +1,136 @@
 /**
  * Discord RPC Client Manager
- * Handles connection and communication with Discord client
+ * Handles connection and communication with the Discord client
+ *
+ * @author Extrise
+ * @license MIT
  */
 
 import * as DiscordRPC from "discord-rpc"
-import { CLIENT_ID, LARGE_IMAGE_KEY, LARGE_IMAGE_TEXT } from "./config"
+import { CLIENT_ID, LARGE_IMAGE_KEY, LARGE_IMAGE_TEXT } from "./constants.js"
 
-interface PresenceData {
-  details?: string
-  state?: string
-  startTimestamp?: number
-  largeImageKey?: string
-  largeImageText?: string
-  smallImageKey?: string
-  smallImageText?: string
-  buttons?: Array<{ label: string; url: string }>
-  instance?: boolean
-}
+const MAX_RECONNECT_ATTEMPTS = 5
+const BASE_RECONNECT_DELAY_MS = 1000
+const MAX_RECONNECT_DELAY_MS = 30000
 
 /**
- * Manages Discord RPC connection and presence updates
+ * Manages the Discord RPC connection and presence updates
  */
 export class DiscordClient {
-  private client: DiscordRPC.Client | undefined
+  private readonly client: DiscordRPC.Client
   private connected = false
   private reconnectAttempts = 0
-  private readonly maxReconnectAttempts: number = 5
+  /** Set while a disconnect was requested by the user; auto-reconnect then stays off. */
+  private manualDisconnect = false
   private reconnectTimer: NodeJS.Timeout | undefined
-  private onReadyCallback: (() => void) | undefined
-  private onDisconnectedCallback: (() => void) | undefined
+  private readyCallback: (() => void) | undefined
+  private disconnectedCallback: (() => void) | undefined
+  private errorCallback: ((error: unknown) => void) | undefined
 
   constructor() {
-    try {
-      this.client = new DiscordRPC.Client({ transport: "ipc" })
-      this.setupEventHandlers()
-    } catch (error) {
-      throw error
-    }
+    this.client = new DiscordRPC.Client({ transport: "ipc" })
+    this.setupEventHandlers()
   }
 
   /**
-   * Setup event handlers for Discord client
+   * Setup event handlers for the Discord client
    */
   private setupEventHandlers(): void {
-    if (!this.client) {
-      return
-    }
-
     // Handle successful connection
     this.client.on("ready", () => {
       this.connected = true
       this.reconnectAttempts = 0
-      if (this.onReadyCallback) {
-        this.onReadyCallback()
-      }
+      this.readyCallback?.()
     })
 
-    // Handle disconnection
+    // Handle disconnection (e.g. Discord was closed or restarted)
     this.client.on("disconnected", () => {
       this.connected = false
-      if (this.onDisconnectedCallback) {
-        this.onDisconnectedCallback()
-      }
-      this.handleDisconnect()
+      this.disconnectedCallback?.()
+      this.scheduleReconnect()
     })
   }
 
   /**
-   * Register callback for when Discord client is ready
+   * Register callback for when the Discord client is ready
    */
   onReady(callback: () => void): void {
-    this.onReadyCallback = callback
+    this.readyCallback = callback
   }
 
   /**
-   * Register callback for when Discord client is disconnected
+   * Register callback for when the Discord client is disconnected
    */
   onDisconnected(callback: () => void): void {
-    this.onDisconnectedCallback = callback
+    this.disconnectedCallback = callback
   }
 
   /**
-   * Connect to Discord client running on user's machine
-   * Uses IPC (Inter-Process Communication) - no authentication needed
+   * Register callback for non-connection RPC errors (e.g. rejected payloads)
+   */
+  onError(callback: (error: unknown) => void): void {
+    this.errorCallback = callback
+  }
+
+  /**
+   * Connect to the Discord client running on the user's machine.
+   * Uses IPC (Inter-Process Communication) - no authentication needed.
    */
   async connect(): Promise<void> {
     if (this.connected) {
       return
     }
 
-    if (!this.client) {
-      throw new Error("Discord RPC client not initialized")
-    }
+    this.manualDisconnect = false
 
-    try {
-      // Login to Discord RPC with application client ID
-      await this.client.login({ clientId: CLIENT_ID })
-    } catch (error) {
-      throw error
-    }
+    await this.client.login({ clientId: CLIENT_ID })
+    this.connected = true
+    this.reconnectAttempts = 0
   }
 
   /**
    * Disconnect from Discord
    */
   async disconnect(): Promise<void> {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = undefined
-    }
+    this.manualDisconnect = true
+    this.cancelReconnect()
+    this.connected = false
 
-    if (this.client && this.connected) {
-      try {
-        await this.client.destroy()
-        this.connected = false
-      } catch (error) {
-        // Silently handle disconnect errors
-      }
+    try {
+      await this.client.destroy()
+    } catch {
+      // Discord may already be gone; there is nothing left to clean up
     }
   }
 
   /**
    * Update Discord Rich Presence with activity data
-   * @param presence - Presence data to display
    */
-  async setActivity(presence: PresenceData): Promise<void> {
-    if (!this.connected || !this.client) {
+  async setActivity(activity: DiscordRPC.Activity): Promise<void> {
+    if (!this.connected) {
       return
     }
 
+    const payload: DiscordRPC.Activity = {
+      details: activity.details ?? "Coding in VS Code",
+      state: activity.state ?? "Working on a project",
+      startTimestamp: activity.startTimestamp,
+      largeImageKey: activity.largeImageKey ?? LARGE_IMAGE_KEY,
+      largeImageText: activity.largeImageText ?? LARGE_IMAGE_TEXT,
+      smallImageKey: activity.smallImageKey,
+      smallImageText: activity.smallImageText,
+      buttons: activity.buttons,
+      instance: false,
+    }
+
     try {
-      const activityPayload: any = {
-        details: presence.details || "Coding in VS Code",
-        state: presence.state || "Working on a project",
-        startTimestamp: presence.startTimestamp,
-        largeImageKey: presence.largeImageKey || LARGE_IMAGE_KEY,
-        largeImageText: presence.largeImageText || LARGE_IMAGE_TEXT,
-        smallImageKey: presence.smallImageKey,
-        smallImageText: presence.smallImageText,
-        instance: false,
-      }
-
-      if (presence.buttons && presence.buttons.length > 0) {
-        activityPayload.buttons = presence.buttons
-      }
-
-      await this.client.setActivity(activityPayload)
+      await this.client.setActivity(payload)
     } catch (error) {
-      if (error instanceof Error && error.message.includes("connection")) {
+      if (this.isConnectionError(error)) {
         this.connected = false
+        this.scheduleReconnect()
+      } else {
+        this.errorCallback?.(error)
       }
     }
   }
@@ -157,50 +139,68 @@ export class DiscordClient {
    * Clear Discord Rich Presence
    */
   async clearActivity(): Promise<void> {
-    if (!this.connected || !this.client) {
+    if (!this.connected) {
       return
     }
 
     try {
       await this.client.clearActivity()
     } catch (error) {
-      // Silently handle clear errors
+      if (this.isConnectionError(error)) {
+        this.connected = false
+        this.scheduleReconnect()
+      } else {
+        this.errorCallback?.(error)
+      }
     }
   }
 
   /**
-   * Handle disconnection and attempt reconnection
+   * Check if the client is connected to Discord
    */
-  private handleDisconnect(): void {
-    // Prevent multiple reconnection attempts
-    if (this.reconnectTimer) {
+  isConnected(): boolean {
+    return this.connected
+  }
+
+  /**
+   * Detect transport level failures that warrant a reconnection
+   */
+  private isConnectionError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false
+    }
+
+    return /connection|disconnect|socket|closed|ECONNRESET|EPIPE/i.test(error.message)
+  }
+
+  /**
+   * Schedule a reconnection with exponential backoff.
+   * Gives up after MAX_RECONNECT_ATTEMPTS so the user can reconnect manually.
+   */
+  private scheduleReconnect(): void {
+    if (this.manualDisconnect || this.reconnectTimer || this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       return
     }
 
-    // Stop reconnecting after max attempts
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      return
-    }
+    const delay = Math.min(BASE_RECONNECT_DELAY_MS * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS)
+    this.reconnectAttempts += 1
 
-    // Exponential backoff for reconnection
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
-
-    this.reconnectTimer = setTimeout(async () => {
+    this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined
-      this.reconnectAttempts++
-
-      try {
-        await this.connect()
-      } catch (error) {
-        this.handleDisconnect()
-      }
+      void this.connect().catch((error) => {
+        this.errorCallback?.(error)
+        this.scheduleReconnect()
+      })
     }, delay)
   }
 
   /**
-   * Check if client is connected to Discord
+   * Cancel any pending reconnection attempt
    */
-  isConnected(): boolean {
-    return this.connected
+  private cancelReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = undefined
+    }
   }
 }

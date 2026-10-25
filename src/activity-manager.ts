@@ -1,37 +1,69 @@
 /**
  * Activity Manager
- * Tracks VS Code activity and updates Discord presence
+ * Tracks VS Code activity and updates the Discord presence
+ *
+ * @author Extrise
+ * @license MIT
  */
 
+import type { Activity } from "discord-rpc"
 import * as vscode from "vscode"
-import type { DiscordClient } from "./discord-client"
-import { type ConfigManager, LANGUAGE_ICONS } from "./config"
+import { LARGE_IMAGE_KEY } from "./constants.js"
+import type { ConfigManager } from "./config.js"
+import type { DiscordClient } from "./discord-client.js"
+import {
+  extractRepoName,
+  formatIssueText,
+  formatTemplate,
+  getFileName,
+  getLanguageIcon,
+  toGitHubHttpsUrl,
+} from "./util.js"
+
+/** How often the idle state is checked. */
+const IDLE_CHECK_INTERVAL_MS = 30000
+/** How long the GitHub repository URL is cached before re-resolving. */
+const REPO_CACHE_MS = 60000
+
+/** Minimal shape of the vscode.git extension API used here. */
+interface GitApi {
+  getAPI(version: number): {
+    repositories: Array<{
+      state: {
+        remotes: Array<{
+          name: string
+          fetchUrl?: string
+          pushUrl?: string
+        }>
+      }
+    }>
+  }
+}
 
 /**
  * Manages VS Code activity tracking and Discord presence updates
  */
 export class ActivityManager {
-  private startTimestamp: number
-  private lastActivityTime: number
+  private startTimestamp = Date.now()
+  private lastActivityTime = Date.now()
+  private lastPresenceUpdate = 0
   private active = false
+  private idle = false
   private idleCheckInterval: NodeJS.Timeout | undefined
+  private pendingUpdate: NodeJS.Timeout | undefined
   private currentEditor: vscode.TextEditor | undefined
   private gitRepoUrl: string | undefined
   private lastRepoUrlCheck = 0
-  private readonly repoUrlCacheMs = 60000 // Cache for 1 minute
   private disposables: vscode.Disposable[] = []
 
   constructor(
-    private discordClient: DiscordClient,
-    private config: ConfigManager,
-  ) {
-    this.startTimestamp = Date.now()
-    this.lastActivityTime = Date.now()
-  }
+    private readonly discordClient: DiscordClient,
+    private readonly config: ConfigManager,
+  ) {}
 
   /**
-   * Start tracking VS Code activity
-   * Registers event listeners for editor changes
+   * Start tracking VS Code activity.
+   * Registers event listeners for editor changes.
    */
   start(): void {
     if (this.active) {
@@ -39,24 +71,26 @@ export class ActivityManager {
     }
 
     this.active = true
+    this.idle = false
     this.startTimestamp = Date.now()
     this.lastActivityTime = Date.now()
 
-    // Track active text editor changes
+    // Track active text editor changes (immediate update so switching files feels instant)
     this.disposables.push(
       vscode.window.onDidChangeActiveTextEditor((editor) => {
-        this.handleEditorChange(editor)
+        this.currentEditor = editor
+        this.schedulePresenceUpdate(true)
       }),
     )
 
-    // Track text document changes (typing)
+    // Track text document changes (typing) - throttled by the update interval
     this.disposables.push(
       vscode.workspace.onDidChangeTextDocument(() => {
         this.handleActivity()
       }),
     )
 
-    // Track when editor gets focus
+    // Track when the editor gets focus
     this.disposables.push(
       vscode.window.onDidChangeWindowState((state) => {
         if (state.focused) {
@@ -67,22 +101,22 @@ export class ActivityManager {
 
     this.disposables.push(
       vscode.languages.onDidChangeDiagnostics(() => {
-        this.updatePresence()
+        this.schedulePresenceUpdate(false)
       }),
     )
 
-    // Check for idle state every 30 seconds
+    // Check for idle state periodically
     this.idleCheckInterval = setInterval(() => {
       this.checkIdleState()
-    }, 30000)
+    }, IDLE_CHECK_INTERVAL_MS)
 
-    // Set initial presence based on current editor
+    // Set initial presence based on the current editor
     this.currentEditor = vscode.window.activeTextEditor
-    this.updatePresence()
+    this.schedulePresenceUpdate(true)
   }
 
   /**
-   * Stop tracking activity and clear presence
+   * Stop tracking activity and clear the presence
    */
   stop(): void {
     if (!this.active) {
@@ -90,133 +124,179 @@ export class ActivityManager {
     }
 
     this.active = false
+    this.idle = false
 
-    // Clear all event listeners
-    this.disposables.forEach((d) => d.dispose())
-    this.disposables = []
+    this.cancelPendingUpdate()
 
-    // Clear idle check interval
     if (this.idleCheckInterval) {
       clearInterval(this.idleCheckInterval)
       this.idleCheckInterval = undefined
     }
 
-    // Clear Discord presence
-    this.discordClient.clearActivity()
+    // Clear all event listeners
+    this.disposables.forEach((disposable) => disposable.dispose())
+    this.disposables = []
+
+    // Clear the Discord presence
+    void this.discordClient.clearActivity()
   }
 
   /**
-   * Refresh presence with current settings
-   * Useful when configuration changes
+   * Refresh the presence with current settings.
+   * Useful when the configuration changes.
    */
   refresh(): void {
     if (this.active) {
-      this.updatePresence()
+      this.schedulePresenceUpdate(true)
     }
   }
 
   /**
-   * Handle editor change event
-   * @param editor - New active editor
+   * Check if activity tracking is active
    */
-  private handleEditorChange(editor: vscode.TextEditor | undefined): void {
-    this.currentEditor = editor
-    this.handleActivity()
+  isActive(): boolean {
+    return this.active
   }
 
   /**
-   * Handle any activity (typing, switching files, etc.)
-   * Updates last activity time and presence
+   * Record user activity and refresh the presence.
+   * Returning from idle always updates immediately.
    */
   private handleActivity(): void {
     this.lastActivityTime = Date.now()
-    this.updatePresence()
+
+    if (this.idle) {
+      this.idle = false
+      this.schedulePresenceUpdate(true)
+      return
+    }
+
+    this.schedulePresenceUpdate(false)
   }
 
   /**
-   * Check if user has been idle for too long
-   * Changes presence to "Idle" state if inactive
+   * Send a presence update to Discord, throttled by the configured
+   * update interval so rapid events (e.g. typing) don't spam the RPC socket.
+   * Immediate updates bypass the throttle; at most one update stays queued.
+   */
+  private schedulePresenceUpdate(immediate: boolean): void {
+    if (!this.active) {
+      return
+    }
+
+    const interval = this.config.getUpdateInterval()
+    const elapsed = Date.now() - this.lastPresenceUpdate
+
+    if (immediate || elapsed >= interval) {
+      this.cancelPendingUpdate()
+      this.lastPresenceUpdate = Date.now()
+      void this.updatePresence()
+      return
+    }
+
+    if (this.pendingUpdate) {
+      return
+    }
+
+    this.pendingUpdate = setTimeout(() => {
+      this.pendingUpdate = undefined
+      this.lastPresenceUpdate = Date.now()
+      void this.updatePresence()
+    }, interval - elapsed)
+  }
+
+  /**
+   * Drop a queued (throttled) presence update, if any
+   */
+  private cancelPendingUpdate(): void {
+    if (this.pendingUpdate) {
+      clearTimeout(this.pendingUpdate)
+      this.pendingUpdate = undefined
+    }
+  }
+
+  /**
+   * Switch the presence to the idle state after inactivity.
+   * Normal presence is restored automatically on the next activity.
    */
   private checkIdleState(): void {
-    const idleTimeout = this.config.getIdleTimeout()
-    const timeSinceActivity = Date.now() - this.lastActivityTime
+    if (!this.active || this.idle) {
+      return
+    }
 
-    // Handle 0 as disabled
-    if (idleTimeout > 0 && timeSinceActivity > idleTimeout) {
-      // User is idle - update presence to show idle state
-      this.discordClient.setActivity({
+    const idleTimeout = this.config.getIdleTimeout()
+
+    if (idleTimeout > 0 && Date.now() - this.lastActivityTime > idleTimeout) {
+      this.idle = true
+      this.cancelPendingUpdate()
+      void this.discordClient.setActivity({
         details: "Idle",
         state: "Away from keyboard",
         startTimestamp: this.startTimestamp,
+        largeImageKey: LARGE_IMAGE_KEY,
+        instance: false,
       })
     }
   }
 
   /**
-   * Get GitHub repository URL from Git configuration
-   * @returns GitHub repository URL or undefined if not found
+   * Get the GitHub repository URL from the Git configuration,
+   * preferring the "origin" remote. Result is cached for a minute.
    */
   private async getGitHubRepoUrl(): Promise<string | undefined> {
-    // Return cached value if it's still fresh
     const now = Date.now()
-    if (this.gitRepoUrl !== undefined && now - this.lastRepoUrlCheck < this.repoUrlCacheMs) {
+
+    if (this.gitRepoUrl !== undefined && now - this.lastRepoUrlCheck < REPO_CACHE_MS) {
       return this.gitRepoUrl
     }
 
+    this.lastRepoUrlCheck = now
+
     try {
-      this.lastRepoUrlCheck = now
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
       if (!workspaceFolder) {
         this.gitRepoUrl = undefined
         return undefined
       }
 
-      // Get Git extension
       const gitExtension = vscode.extensions.getExtension("vscode.git")
       if (!gitExtension) {
         this.gitRepoUrl = undefined
         return undefined
       }
 
-      const git = gitExtension.isActive ? gitExtension.exports : await gitExtension.activate()
-      const api = git.getAPI(1)
+      const git = (gitExtension.isActive ? gitExtension.exports : await gitExtension.activate()) as GitApi
+      const repositories = git.getAPI(1).repositories
 
-      if (api.repositories.length === 0) {
+      if (repositories.length === 0) {
         this.gitRepoUrl = undefined
         return undefined
       }
 
-      const repository = api.repositories[0]
-      const remotes = repository.state.remotes
+      const remotes = repositories[0].state.remotes
+      const origin = remotes.find((remote) => remote.name === "origin")
+      const orderedRemotes = origin ? [origin, ...remotes.filter((remote) => remote !== origin)] : remotes
 
-      // Look for origin or any GitHub remote
-      for (const remote of remotes) {
-        const url = remote.fetchUrl || remote.pushUrl
+      for (const remote of orderedRemotes) {
+        const url = remote.fetchUrl ?? remote.pushUrl
+
         if (url && url.includes("github.com")) {
-          // Convert SSH URL to HTTPS URL
-          let httpsUrl = url
-          if (url.startsWith("git@github.com:")) {
-            httpsUrl = url.replace("git@github.com:", "https://github.com/")
-          }
-          // Remove .git suffix
-          httpsUrl = httpsUrl.replace(/\.git$/, "")
-          this.gitRepoUrl = httpsUrl
-          return httpsUrl
+          this.gitRepoUrl = toGitHubHttpsUrl(url)
+          return this.gitRepoUrl
         }
       }
 
       this.gitRepoUrl = undefined
       return undefined
-    } catch (error) {
-      // Silently fail if Git is not available
+    } catch {
+      // Git is not available or not a repository
       this.gitRepoUrl = undefined
       return undefined
     }
   }
 
   /**
-   * Get issue count for current file
-   * @returns Object with error and warning counts
+   * Get the issue count for the current file
    */
   private getIssueCount(): { errors: number; warnings: number } {
     if (!this.currentEditor) {
@@ -240,8 +320,8 @@ export class ActivityManager {
   }
 
   /**
-   * Update Discord presence based on current activity
-   * Formats and sends presence data to Discord
+   * Build the presence payload from the current activity and settings,
+   * then send it to Discord
    */
   private async updatePresence(): Promise<void> {
     if (!this.active || !this.discordClient.isConnected()) {
@@ -249,45 +329,44 @@ export class ActivityManager {
     }
 
     const editor = this.currentEditor
-
-    // Gather information about current activity
-    const fileName = editor?.document.fileName ? this.getFileName(editor.document.fileName) : "No file open"
-    const languageId = editor?.document.languageId || "text"
+    const fileName = editor ? getFileName(editor.document.fileName) : "No file open"
+    const languageId = editor?.document.languageId || "plaintext"
     const workspaceName = this.getWorkspaceName()
 
     const githubUrl = this.config.shouldShowGitHubRepo() ? await this.getGitHubRepoUrl() : undefined
-    const repoName = githubUrl ? this.extractRepoName(githubUrl) : undefined
+    const repoName = githubUrl ? extractRepoName(githubUrl) : undefined
+    const issueText = this.config.shouldShowIssues() ? formatIssueText(this.getIssueCount()) : ""
+    const languageIcon = getLanguageIcon(languageId)
 
-    const issues = this.config.shouldShowIssues() ? this.getIssueCount() : { errors: 0, warnings: 0 }
-    const issueText = this.formatIssueText(issues)
+    let details = formatTemplate(this.config.getDetailsFormat(), {
+      filename: fileName,
+      language: languageIcon.text,
+      workspace: repoName ?? workspaceName,
+    })
 
-    // Format details and state text using configuration
-    let details = this.formatText(this.config.getDetailsFormat(), fileName, languageId, repoName || workspaceName)
-
-    if (issueText && this.config.shouldShowIssues()) {
+    if (issueText) {
       details = `${details} ${issueText}`
     }
 
-    let state = this.formatText(this.config.getStateFormat(), fileName, languageId, workspaceName)
+    const state = formatTemplate(this.config.getStateFormat(), {
+      filename: fileName,
+      language: languageIcon.text,
+      workspace: workspaceName,
+    })
 
-    if (repoName && this.config.shouldShowGitHubRepo()) {
-      state = `📦 ${repoName}`
-    }
+    const showSmallImage = this.config.shouldShowLanguage() && this.config.shouldShowFileIcon()
 
-    // Get language-specific icon if available
-    const languageIcon = this.getLanguageIcon(languageId)
-
-    const presenceData: any = {
+    const presence: Activity = {
       details: this.config.shouldShowFileName() ? details : "Editing a file",
       state: this.config.shouldShowWorkspace() ? state : "Working in VS Code",
       startTimestamp: this.config.shouldShowElapsedTime() ? this.startTimestamp : undefined,
       largeImageText: this.config.getLargeImageText(),
-      smallImageKey: languageIcon.key,
-      smallImageText: languageIcon.text,
+      smallImageKey: showSmallImage ? languageIcon.key : undefined,
+      smallImageText: showSmallImage ? languageIcon.text : undefined,
     }
 
     if (githubUrl) {
-      presenceData.buttons = [
+      presence.buttons = [
         {
           label: "View Repository",
           url: githubUrl,
@@ -295,99 +374,14 @@ export class ActivityManager {
       ]
     }
 
-    // Update Discord presence
-    await this.discordClient.setActivity(presenceData)
+    await this.discordClient.setActivity(presence)
   }
 
   /**
-   * Extract repository name from GitHub URL
-   * @param url - GitHub repository URL
-   * @returns Repository name in format "owner/repo"
-   */
-  private extractRepoName(url: string): string {
-    try {
-      const match = url.match(/github\.com[/:]([\w-]+\/[\w-]+)/)
-      return match ? match[1] : "GitHub Repository"
-    } catch (error) {
-      return "GitHub Repository"
-    }
-  }
-
-  /**
-   * Format issue count into readable text
-   * @param issues - Object with error and warning counts
-   * @returns Formatted issue text or empty string
-   */
-  private formatIssueText(issues: { errors: number; warnings: number }): string {
-    const parts: string[] = []
-
-    if (issues.errors > 0) {
-      parts.push(`${issues.errors} ❌`)
-    }
-
-    if (issues.warnings > 0) {
-      parts.push(`${issues.warnings} ⚠️`)
-    }
-
-    return parts.length > 0 ? `(${parts.join(", ")})` : ""
-  }
-
-  /**
-   * Get file name from full file path
-   * @param filePath - Full path to file
-   * @returns File name without path
-   */
-  private getFileName(filePath: string): string {
-    const parts = filePath.split(/[\\/]/)
-    return parts[parts.length - 1] || "Unknown file"
-  }
-
-  /**
-   * Get current workspace name
-   * @returns Workspace folder name or default text
+   * Get the current workspace name
    */
   private getWorkspaceName(): string {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]
     return workspaceFolder?.name || "No workspace"
-  }
-
-  /**
-   * Format text string with variable substitution
-   * @param format - Format string with variables
-   * @param fileName - Current file name
-   * @param language - Programming language
-   * @param workspace - Workspace name
-   * @returns Formatted string
-   */
-  private formatText(format: string, fileName: string, language: string, workspace: string): string {
-    return format.replace("{filename}", fileName).replace("{language}", language).replace("{workspace}", workspace)
-  }
-
-  /**
-   * Get icon information for programming language
-   * @param languageId - VS Code language identifier
-   * @returns Icon key and text
-   */
-  private getLanguageIcon(languageId: string): { key?: string; text: string } {
-    const icon = LANGUAGE_ICONS[languageId]
-
-    if (icon) {
-      return {
-        key: icon.key,
-        text: icon.name,
-      }
-    }
-
-    return {
-      key: "text",
-      text: languageId.charAt(0).toUpperCase() + languageId.slice(1),
-    }
-  }
-
-  /**
-   * Check if activity tracking is active
-   */
-  isActive(): boolean {
-    return this.active
   }
 }

@@ -1,198 +1,247 @@
 # StatusCode
 
-[![Vs Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/extrise.statuscode?label=VS%20Code%20Marketplace&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=extrise.statuscode)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Publish](https://img.shields.io/github/actions/workflow/status/extrise/statuscode/publish.yml?style=for-the-badge&logo=github&label=Publish)](https://github.com/extrise/statuscode/actions)
-
-<div>
-    <img src="https://raw.githubusercontent.com/extrise/statuscode/main/assets/demo.png" alt="StatusCode Demo" />
+<div align="center">
+    <img src="https://raw.githubusercontent.com/extrise/statuscode/main/assets/demo.png" alt="StatusCode demo — a Discord profile showing VS Code activity" width="720" />
 </div>
 
-Show off your coding activity on Discord with StatusCode - a lightweight VS Code extension that brings beautiful Rich Presence integration to your development workflow.
+<div align="center">
+
+
+[![Visual Studio Marketplace Version (short)](https://vsmarketplacebadges.dev/version-short/ExtRise.statuscode.svg)](https://marketplace.visualstudio.com/items?itemName=ExtRise.statuscode)
+[![Visual Studio Marketplace Downloads (short)](https://vsmarketplacebadges.dev/downloads-short/ExtRise.statuscode.svg)](https://marketplace.visualstudio.com/items?itemName=ExtRise.statuscode)
+[![CI](https://github.com/extrise/statuscode/actions/workflows/ci.yml/badge.svg)](https://github.com/extrise/statuscode/actions/workflows/ci.yml)
+[![Publish](https://github.com/nmlletras/statuscode/actions/workflows/publish.yml/badge.svg)](https://github.com/nmlletras/statuscode/actions/workflows/publish.yml)
+
+**Show off your coding activity on Discord with beautiful Rich Presence — right from VS Code.**
+
+</div>
+
+---
 
 ## What is StatusCode?
 
-StatusCode connects your Visual Studio Code to Discord, displaying what you're working on in real-time. Your friends and server members can see what file you're editing, which language you're coding in, and how long you've been at it.
+StatusCode connects Visual Studio Code to Discord and displays what you are working on in real time. Friends and server members can see the file you are editing, the language you are coding in, the project you are in, and how long you have been at it.
 
-Perfect for developers who want to share their coding journey, collaborate with teammates, or just show the world they're building something awesome.
+It works out of the box with sensible defaults, updates your presence live as you switch files and languages, and gives you full control over exactly what is shared — down to the text on each line.
 
 ## Features
 
-- **Real-time Activity Tracking** - Automatically updates your Discord status as you code
-- **Language Detection** - Shows icons for over 18 programming languages
-- **File & Workspace Display** - Let people know what project and file you're working on
-- **Elapsed Time Counter** - Display how long you've been coding
-- **Highly Customizable** - Tweak every aspect of what appears on your Discord profile
-- **Privacy Controls** - Choose exactly what information to share
-- **Auto-Reconnect** - Seamlessly handles Discord restarts
-- **Lightweight** - Minimal performance impact on your editor
+- **Real-time activity tracking** — your Discord status follows you as you code, open, close and switch files
+- **Language detection** — icons for 60+ languages and formats (unknown ones fall back to a generic icon with a capitalized label)
+- **File & workspace display** — show the project and the exact file you are working on
+- **File type icon** — the current file's language icon as the small image
+- **GitHub repository button** — a clickable button linking to your workspace's repository (supports HTTPS and SSH remotes)
+- **Error & warning count** — surface the diagnostics for the current file, e.g. `(2 ❌, 1 ⚠️)`
+- **Elapsed time counter** — Discord's native "elapsed" display for how long the session has been running
+- **Highly customizable** — tweak every line of text shown on your profile with template variables
+- **Privacy controls** — choose exactly what information to share, field by field
+- **Auto-reconnect** — transparently handles Discord restarting without touching VS Code
+- **Lightweight** — minimal performance impact on your editor
+
+## Requirements
+
+- [Discord desktop app](https://discord.com/download) running on the **same machine** (the browser version does not support Rich Presence)
+- Visual Studio Code **1.138 or newer**
 
 ## Installation
 
-### Option 1: Install from VSIX file
+### Option 1: VS Code Marketplace
+
+1. Open the Extensions panel (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+2. Search for **StatusCode**
+3. Click **Install**
+
+Or open the [StatusCode Marketplace page](https://marketplace.visualstudio.com/items?itemName=extrise.statuscode) and click **Install**.
+
+### Option 2: Install from VSIX
 
 1. Download `statuscode-{version}.vsix` from the [latest release](https://github.com/extrise/statuscode/releases)
-2. Open VS Code
-3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
-4. Type "Extensions: Install from VSIX"
-5. Select the downloaded `.vsix` file
-6. Restart VS Code
-
-### Option 2: VS Code Marketplace
-
-Search for "StatusCode" in the VS Code Extensions panel and click Install.
-
-Or visit the [StatusCode Marketplace page](https://marketplace.visualstudio.com/items?itemName=extrise.statuscode) and click "Install".
+2. Open VS Code, press `Ctrl+Shift+P` (`Cmd+Shift+P` on macOS)
+3. Run **Extensions: Install from VSIX** and select the downloaded file
+4. Reload VS Code
 
 ## Quick Start
 
-1. Make sure Discord is running on your computer
-2. Open VS Code - StatusCode will automatically connect
-3. Look at your Discord profile - you should see your activity
+1. Make sure the Discord desktop app is running
+2. Open VS Code — StatusCode connects automatically on startup
+3. Check your Discord profile — your activity appears within a few seconds
 
-That's it. StatusCode works out of the box with sensible defaults.
+That's it. Nothing else to configure.
+
+## How it looks
+
+| Discord shows | Example |
+|---|---|
+| **Details** | `Coding in Visual Studio Code` |
+| **State** | `Editing extension.ts` |
+| **Small image** | TypeScript icon + language name |
+| **Button** | `GitHub Repository` → your workspace's repo |
+| **Problems** | `(2 ❌, 1 ⚠️)` when the current file has diagnostics |
+| **Timer** | elapsed time since the session started |
+
+The `StatusCode` item in the status bar (bottom right) shows the live connection state — click it to reconnect at any time.
 
 ## Configuration
 
-StatusCode offers plenty of customization options. Open VS Code settings and search for "StatusCode" to configure:
+Open VS Code Settings and search for **StatusCode**.
 
-### Basic Settings
+### Display
 
 | Setting | Description | Default |
-|---------|-------------|---------|
+|---------|-------------|:-------:|
 | `statuscode.enabled` | Enable or disable Rich Presence | `true` |
 | `statuscode.showFileName` | Display the current file name | `true` |
-| `statuscode.showWorkspace` | Display workspace/folder name | `true` |
-| `statuscode.showLanguage` | Show programming language icon | `true` |
-| `statuscode.showElapsedTime` | Show time since VS Code started | `true` |
-| `statuscode.showFileIcon` | Show file type icon | `true` |
+| `statuscode.showWorkspace` | Display the workspace/folder name | `true` |
+| `statuscode.showLanguage` | Show the programming language icon | `true` |
+| `statuscode.showElapsedTime` | Show the elapsed-time counter | `true` |
+| `statuscode.showFileIcon` | Show the file type icon as the small image | `true` |
+| `statuscode.showGitHubRepo` | Show the GitHub repository button | `true` |
+| `statuscode.showIssues` | Show the error/warning count for the current file | `true` |
 
-### Customization
+### Custom text
 
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `statuscode.details` | Custom details text | `"Coding in Visual Studio Code"` |
 | `statuscode.state` | Custom state text | `"Editing {filename}"` |
-| `statuscode.largeImageText` | Hover text for large image | `"Visual Studio Code"` |
+| `statuscode.largeImageText` | Hover text on the large image | `"Visual Studio Code"` |
+
+### Template variables
+
+Use these placeholders in `details`, `state` and `largeImageText` — every occurrence is replaced:
+
+| Variable | Meaning | Example value |
+|---|---|---|
+| `{filename}` | Current file name | `index.ts` |
+| `{workspace}` | Workspace folder name | `my-project` |
+| `{language}` | Programming language | `TypeScript` |
+
+Example custom state: `"Working on {filename} in {workspace} ({language})"` — renders as
+`Working on index.ts in my-project (TypeScript)`.
 
 ### Advanced
 
 | Setting | Description | Default |
-|---------|-------------|---------|
-| `statuscode.idleTimeout` | Hide after X minutes idle (0 = disabled) | `0` |
-| `statuscode.reconnectInterval` | Discord reconnect interval (ms) | `5000` |
-| `statuscode.updateInterval` | Activity update interval (ms) | `15000` |
-
-### Custom Text Variables
-
-You can use these variables in your custom text:
-
-- `{filename}` - Current file name (e.g., "index.ts")
-- `{workspace}` - Workspace folder name (e.g., "my-project")
-- `{language}` - Programming language (e.g., "TypeScript")
-
-Example custom state: `"Working on {filename} in {workspace}"`
+|---------|-------------|:-------:|
+| `statuscode.idleTimeout` | Hide the presence after X minutes of inactivity (0 = disabled) | `0` |
+| `statuscode.reconnectInterval` | Reconnect interval in milliseconds | `5000` |
+| `statuscode.updateInterval` | Activity update interval in milliseconds | `15000` |
 
 ## Commands
 
-StatusCode adds these commands to VS Code (access via `Ctrl+Shift+P` or `Cmd+Shift+P`):
+All commands are available from the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
-- **StatusCode: Enable Rich Presence** - Turn on Discord presence
-- **StatusCode: Disable Rich Presence** - Turn off Discord presence
-- **StatusCode: Reconnect to Discord** - Force reconnect (useful if Discord was restarted)
+| Command | Description |
+|---|---|
+| **StatusCode: Enable Rich Presence** | Turn the presence back on |
+| **StatusCode: Disable Rich Presence** | Turn the presence off |
+| **StatusCode: Reconnect to Discord** | Force a reconnect — useful after Discord was restarted |
 
-You can also click the StatusCode icon in your status bar (bottom right) to quickly reconnect.
+Tip: the status bar item (`$(radio-tower) StatusCode`, bottom right) is itself the Reconnect command — a single click retries the connection.
 
-## Supported Languages
+## Supported languages
 
-StatusCode recognizes these programming languages and shows appropriate icons:
+StatusCode ships with icons and labels for 60+ languages and formats:
 
-JavaScript, TypeScript, Python, Java, C#, C++, C, Go, Rust, PHP, Ruby, HTML, CSS, JSON, Markdown, YAML, XML, SQL
+| Group | Languages |
+|---|---|
+| **Web** | JavaScript, TypeScript, React (JSX/TSX), HTML, CSS, SCSS, Sass, Less, Vue, Svelte |
+| **Systems & general** | Python, Java, C#, C++, C, Go, Rust, PHP, Ruby, Swift, Kotlin, Scala, Dart |
+| **Scripting** | Shell Script / Bash, PowerShell, Perl, Lua |
+| **Data & config** | JSON, YAML, TOML, XML, SQL, GraphQL, INI, Properties |
+| **Docs & markup** | Markdown, LaTeX, reStructuredText, AsciiDoc |
+| **DevOps & build** | Docker / Docker Compose, Nginx, Makefile, CMake, Gradle |
+| **Functional & others** | Haskell, Elixir, Erlang, Clojure, F#, OCaml, R, Julia |
+| **Low-level & misc** | Assembly, LLVM, Plain Text, Log, Git Ignore / Git Config |
 
-Don't see your language? Open an issue and we'll add it.
+Missing your language? Unknown languages fall back to a generic icon with a capitalized label — or [open an issue](https://github.com/extrise/statuscode/issues) and we'll add it.
 
 ## Troubleshooting
 
-### Discord doesn't show my activity
+**Discord doesn't show my activity**
 
-1. Make sure Discord is running before starting VS Code
-2. Check that Rich Presence is enabled in Discord Settings → Activity Privacy → Display current activity
-3. Try running the command "StatusCode: Reconnect to Discord"
-4. Restart both Discord and VS Code
+1. Start the Discord desktop app **before** VS Code
+2. In Discord, go to **Settings → Activity Privacy** and enable **Display current activity**
+3. Run the command **StatusCode: Reconnect to Discord**
+4. Still stuck? Restart both Discord and VS Code
 
-### Status bar shows "Disabled"
+**Status bar shows "Disabled"**
 
-StatusCode is turned off. Run "StatusCode: Enable Rich Presence" or check your settings.
+The presence is turned off. Run **StatusCode: Enable Rich Presence**, or check the `statuscode.enabled` setting.
 
-### Connection keeps failing
+**Connection keeps failing**
 
-- Ensure Discord desktop app is installed (not just browser version)
-- Check if another app is using Discord RPC
-- Try restarting Discord as administrator (Windows)
+- Make sure the Discord desktop app is installed — the browser version cannot provide Rich Presence
+- Close other apps that use Discord RPC — only one client may connect at a time
+- On Windows, try restarting Discord as administrator
 
 ## Privacy
 
-StatusCode only sends information you configure to Discord. By default, it shows:
-- File name you're editing
-- Workspace/project name
-- Programming language
-- Time elapsed
+StatusCode only sends the information you configure to Discord, on your local machine. By default that means: the file name, the workspace name, the language, and the elapsed time — each of which can be turned off individually.
 
-You can disable any of these in settings. StatusCode does not:
+StatusCode does **not**:
+
 - Send file contents
 - Track your keystrokes
 - Collect any personal data
-- Communicate with external servers (only Discord on your local machine)
-
-## Contributing
-
-Found a bug or want to request a feature? Open an issue on [GitHub](https://github.com/extrise/statuscode/issues).
-
-Want to contribute code? Pull requests are welcome:
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- Contact external servers — it talks only to Discord's IPC endpoint on your own machine
 
 ## Building from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/extrise/statuscode.git
 cd statuscode
 
-# Install dependencies
-npm install
+# Install dependencies (npm 12 users: run scripts are allowlisted in package.json)
+npm ci
 
 # Compile the extension
 npm run compile
 
-# Package as VSIX
+# Package as a VSIX
 npm run package
 ```
 
+### Development
+
+```bash
+npm run watch        # recompile on every change
+npm run lint         # ESLint
+npm run format       # Prettier
+npm run format:check # Prettier check
+npm test             # compile + unit tests
+```
+
+## Contributing
+
+Bug reports and feature requests are welcome — [open an issue](https://github.com/extrise/statuscode/issues).
+
+To contribute code:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes
+4. Push the branch and open a Pull Request
+
+Please make sure `npm test`, `npm run lint` and `npm run format:check` pass before submitting.
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Distributed under the [MIT License](LICENSE).
 
 ## Acknowledgments
 
-Built with [discord-rpc](https://github.com/discordjs/RPC) for seamless Discord integration.
-
-Inspired by the developer community's love for showing off their code.
+- Built on [discord-rpc](https://github.com/discordjs/RPC) for seamless Discord integration
+- Language icons hosted through the extension's Discord Rich Presence assets
+- Inspired by developers everywhere who love showing off their code
 
 ## Support
 
-Having issues? Need help?
+Having trouble or want to help?
 
-- Open an [issue on GitHub](https://github.com/extrise/statuscode/issues)
-- Check existing issues for solutions
-- Join the discussion in the community
+- [Open an issue](https://github.com/extrise/statuscode/issues) or check existing ones for solutions
+- [Star the repo](https://github.com/extrise/statuscode/stargazers) if you find StatusCode useful
 
 ---
 
-Made with ❤️ by [Extrise](https://github.com/extrise)
-
-**Happy Coding!**
+Made with ❤️ by [Extrise](https://github.com/extrise) — **Happy Coding!**
