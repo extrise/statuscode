@@ -79,14 +79,16 @@ export class ActivityManager {
     this.disposables.push(
       vscode.window.onDidChangeActiveTextEditor((editor) => {
         this.currentEditor = editor
-        this.schedulePresenceUpdate(true)
+        // Switching files is user activity: it must also leave the idle state,
+        // otherwise the idle timer re-triggers and overwrites the new presence
+        this.recordActivity(true)
       }),
     )
 
     // Track text document changes (typing) - throttled by the update interval
     this.disposables.push(
       vscode.workspace.onDidChangeTextDocument(() => {
-        this.handleActivity()
+        this.recordActivity(false)
       }),
     )
 
@@ -94,14 +96,17 @@ export class ActivityManager {
     this.disposables.push(
       vscode.window.onDidChangeWindowState((state) => {
         if (state.focused) {
-          this.handleActivity()
+          this.recordActivity(false)
         }
       }),
     )
 
     this.disposables.push(
       vscode.languages.onDidChangeDiagnostics(() => {
-        this.schedulePresenceUpdate(false)
+        // Diagnostics are not user activity; they must not wake the idle state
+        if (!this.idle) {
+          this.schedulePresenceUpdate(false)
+        }
       }),
     )
 
@@ -162,16 +167,15 @@ export class ActivityManager {
    * Record user activity and refresh the presence.
    * Returning from idle always updates immediately.
    */
-  private handleActivity(): void {
+  private recordActivity(immediate: boolean): void {
     this.lastActivityTime = Date.now()
 
     if (this.idle) {
       this.idle = false
-      this.schedulePresenceUpdate(true)
-      return
+      immediate = true
     }
 
-    this.schedulePresenceUpdate(false)
+    this.schedulePresenceUpdate(immediate)
   }
 
   /**
@@ -324,7 +328,9 @@ export class ActivityManager {
    * then send it to Discord
    */
   private async updatePresence(): Promise<void> {
-    if (!this.active || !this.discordClient.isConnected()) {
+    // While idle the "Idle / Away from keyboard" presence stands; a queued or
+    // racing update must not overwrite it
+    if (!this.active || this.idle || !this.discordClient.isConnected()) {
       return
     }
 

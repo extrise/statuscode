@@ -42,15 +42,16 @@ export function getFileName(filePath: string): string {
 
 /**
  * Extract the "owner/repo" name from a GitHub URL, with a readable fallback.
+ * A trailing ".git" suffix is dropped so it never shows in the presence.
  */
 export function extractRepoName(url: string): string {
   const match = url.match(/github\.com[/:]([\w.-]+\/[\w.-]+)/)
-  return match ? match[1] : "GitHub Repository"
+  return match ? match[1].replace(/\.git$/i, "") : "GitHub Repository"
 }
 
 /**
- * Convert a GitHub remote URL (HTTPS, SSH or ssh:// form) into an HTTPS URL
- * without the .git suffix, suitable for a clickable Discord button.
+ * Convert a GitHub remote URL (HTTPS, SSH, git:// or http:// form) into an
+ * HTTPS URL without the .git suffix, suitable for a clickable Discord button.
  */
 export function toGitHubHttpsUrl(url: string): string {
   let httpsUrl = url
@@ -59,9 +60,12 @@ export function toGitHubHttpsUrl(url: string): string {
     httpsUrl = `https://github.com/${url.slice("git@github.com:".length)}`
   } else if (url.startsWith("ssh://git@github.com/")) {
     httpsUrl = `https://github.com/${url.slice("ssh://git@github.com/".length)}`
+  } else {
+    httpsUrl = httpsUrl.replace(/^git:\/\/github\.com\//i, "https://github.com/")
+    httpsUrl = httpsUrl.replace(/^http:\/\/github\.com\//i, "https://github.com/")
   }
 
-  return httpsUrl.replace(/\.git$/, "")
+  return httpsUrl.replace(/\.git$/i, "").replace(/\/+$/, "")
 }
 
 /**
@@ -99,6 +103,27 @@ export function getLanguageIcon(languageId: string): LanguageIcon {
     key: "text",
     text: languageId.charAt(0).toUpperCase() + languageId.slice(1),
   }
+}
+
+/**
+ * Discord rejects rich presence text fields longer than this many characters.
+ */
+export const DISCORD_TEXT_LIMIT = 128
+
+/**
+ * Trim a rich presence text field to Discord's length limit, or pass it
+ * through untouched. `undefined` stays `undefined`.
+ */
+export function truncateDiscordText(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (value.length <= DISCORD_TEXT_LIMIT) {
+    return value
+  }
+
+  return `${value.slice(0, DISCORD_TEXT_LIMIT - 1)}…`
 }
 
 /**
