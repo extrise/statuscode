@@ -132,6 +132,7 @@ function startRetryLoop(): void {
 
     void startPresence().catch((error) => {
       log("Failed to connect to Discord, retrying...", error)
+      updateStatusBar("Retrying…", "$(sync~spin)")
     })
   }, interval)
 }
@@ -146,6 +147,7 @@ function scheduleAutoStart(): void {
     startupTimer = undefined
     void startPresence().catch((error) => {
       log("Initial connection to Discord failed, retrying in the background...", error)
+      updateStatusBar("Retrying…", "$(sync~spin)")
       startRetryLoop()
     })
   }, STARTUP_DELAY_MS)
@@ -169,6 +171,7 @@ async function handleConfigurationChange(): Promise<void> {
       await startPresence()
     } catch (error) {
       log("Failed to connect after configuration change, retrying in the background...", error)
+      updateStatusBar("Retrying…", "$(sync~spin)")
       startRetryLoop()
     }
     return
@@ -181,6 +184,11 @@ async function handleConfigurationChange(): Promise<void> {
   }
 
   if (enabled && active) {
+    // A changed reconnect interval must restart the retry loop to take effect
+    stopRetryLoop()
+    if (!discordClient?.isConnected()) {
+      startRetryLoop()
+    }
     activityManager?.refresh()
   }
 }

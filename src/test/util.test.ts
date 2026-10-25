@@ -13,6 +13,7 @@ import { describe, it } from "node:test"
 
 import { LANGUAGE_ICONS } from "../constants.js"
 import {
+  DISCORD_TEXT_LIMIT,
   extractRepoName,
   formatIssueText,
   formatTemplate,
@@ -20,6 +21,7 @@ import {
   getLanguageIcon,
   normalizeNumber,
   toGitHubHttpsUrl,
+  truncateDiscordText,
 } from "../util.js"
 
 describe("formatTemplate", () => {
@@ -80,6 +82,10 @@ describe("extractRepoName", () => {
     assert.equal(extractRepoName("git@github.com:extrise/statuscode"), "extrise/statuscode")
   })
 
+  it("drops the .git suffix", () => {
+    assert.equal(extractRepoName("https://github.com/extrise/statuscode.git"), "extrise/statuscode")
+  })
+
   it("falls back when the URL is not GitHub", () => {
     assert.equal(extractRepoName("https://gitlab.com/group/project"), "GitHub Repository")
   })
@@ -99,6 +105,18 @@ describe("toGitHubHttpsUrl", () => {
 
   it("keeps HTTPS URLs and drops the .git suffix", () => {
     assert.equal(toGitHubHttpsUrl("https://github.com/extrise/statuscode.git"), "https://github.com/extrise/statuscode")
+  })
+
+  it("normalizes git:// URLs", () => {
+    assert.equal(toGitHubHttpsUrl("git://github.com/extrise/statuscode.git"), "https://github.com/extrise/statuscode")
+  })
+
+  it("upgrades http:// URLs to https", () => {
+    assert.equal(toGitHubHttpsUrl("http://github.com/extrise/statuscode"), "https://github.com/extrise/statuscode")
+  })
+
+  it("strips trailing slashes", () => {
+    assert.equal(toGitHubHttpsUrl("https://github.com/extrise/statuscode/"), "https://github.com/extrise/statuscode")
   })
 })
 
@@ -129,6 +147,28 @@ describe("getLanguageIcon", () => {
     for (const languageId of ["javascript", "python", "go", "rust", "markdown"]) {
       assert.ok(LANGUAGE_ICONS[languageId], `missing icon for ${languageId}`)
     }
+  })
+})
+
+describe("truncateDiscordText", () => {
+  it("passes short text through unchanged", () => {
+    assert.equal(truncateDiscordText("Coding in VS Code"), "Coding in VS Code")
+  })
+
+  it("keeps undefined undefined", () => {
+    assert.equal(truncateDiscordText(undefined), undefined)
+  })
+
+  it("trims text at the Discord limit with an ellipsis", () => {
+    const long = "x".repeat(DISCORD_TEXT_LIMIT + 10)
+    const result = truncateDiscordText(long)
+    assert.equal(result?.length, DISCORD_TEXT_LIMIT)
+    assert.equal(result?.endsWith("…"), true)
+  })
+
+  it("keeps text exactly at the limit untouched", () => {
+    const exact = "y".repeat(DISCORD_TEXT_LIMIT)
+    assert.equal(truncateDiscordText(exact), exact)
   })
 })
 
